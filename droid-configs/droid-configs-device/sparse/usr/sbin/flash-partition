@@ -1,0 +1,216 @@
+#!/bin/sh
+
+#
+# Copyright (C) 2013 Jolla Ltd.
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of the <organization> nor the
+#       names of its contributors may be used to endorse or promote products
+#       derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Authors:
+#   Kalle Jokiniemi <kalle.jokiniemi@jolla.com>
+#   David Greaves <david.greaves@jolla.com>
+#   Marko Saukko <marko.saukko@jolla.com>
+#
+
+DEVICE_INFO_FILE=/var/lib/flash-partition/device-info
+
+if [ ! -e $DEVICE_INFO_FILE ]; then
+  echo "Unable to find partition info file '$DEVICE_INFO_FILE'."
+  exit 1
+fi
+
+source $DEVICE_INFO_FILE
+
+if [ -z "$CPUCHECK_STRING" ]; then
+  echo "CPU check string variable 'CPUCHECK_STRING' needs to be defined currently empty."
+  exit 1
+fi
+
+DEVICE=
+USE_BLKID=0
+if [[ -z "$PART_I" ]]; then
+  USE_BLKID=1
+elif [[ -z "$PART_1" || -z "$PART_REAL_1" ]]; then
+  echo "At least one partition needs to be defined variables PART_1, PART_REAL_1 and PART_I."
+  exit 1
+fi
+
+
+print_help()
+{
+        echo ""
+        echo "  $0"
+        echo "    A tool for on-device partition flashing"
+        echo ""
+        echo "  Usage:"
+        echo "    $0 <partition_label> <image_file> <optional_extra_arguments>"
+        echo ""
+}
+
+# Test if we are running on device
+on_device()
+{
+        if grep -q "$CPUCHECK_STRING" /proc/cpuinfo > /dev/null; then
+                return 0
+        elif grep -q "$CPUCHECK_STRING" /sys/firmware/devicetree/base/model > /dev/null; then
+                return 0
+        else
+                return 1
+        fi
+}
+
+# Test that $1 is a valid partition name, and that $2 is a file
+parameters_correct()
+{
+        if [[ -z "$1" || -z "$2" ]]; then
+                echo "Parameter(s) missing!"
+                return 1;
+        fi
+        if [[ ! -e "$2" ]]; then
+                echo "No such image file \"$2\"!"
+                return 1
+        fi
+        return 0
+}
+
+# Parameter $1 should be the partition name like "boot"
+find_device()
+{
+        if [[ "${1:0:1}" = "/" ]]; then
+                echo "Using provided absoulte device path"
+                DEVICE=$1
+        elif [[ $USE_BLKID -eq 1 ]]; then
+                echo "Using blkid to lookup device"
+                DEVICE=$(blkid -t PARTLABEL="$1" -o device)
+        else
+                echo "Using device-info mappings to lookup device"
+                for I in ${PART_I}; do
+                        eval PART="\${PART_$I}"
+                        if [[ ${PART} = "$1" ]]; then
+                                eval DEVICE="/dev/\${PART_REAL_$I}"
+                                break
+                        fi
+                done
+        fi
+        if [[ -z "$DEVICE" ]]; then
+                echo "Could not find device for $1"
+                exit 1
+        fi
+        if [[ ! -b "$DEVICE" ]]; then
+                echo "$DEVICE is not a block device"
+                exit 1
+        fi
+}
+
+## EXECUTION STARTS HERE ##
+
+if ! parameters_correct $1 $2; then
+        print_help
+        exit 1
+fi
+
+if test $1 = "--help"; then
+        print_help
+        exit 0
+fi
+
+if on_device; then
+        find_device $1
+        echo Flashing to $DEVICE
+
+        # If we are flashing boot partition and we are running multirom setup
+        # which can be detected by having data_subdir= in th ecmdline skip boot
+        # partition flashing as it is not needed.
+        mrom_check=$(grep data_subdir= /proc/cmdline)
+        if test $1 = boot && [ ! -z "$mrom_check" ]; then
+          echo "Skipping flashing of boot partition as multirom setup detected."
+          echo "Update multirom boot image, ramdisk and kernel"
+          pref_path="/android"
+          data_path=$(/usr/bin/droid/get_partition.sh /data)
+          [[ -d $pref_path/media/0/multirom ]] || mkdir -p $pref_path && mount $data_path $pref_path
+          mrom_path=$(echo $mrom_check | sed 's/.*data_subdir=\(.*\)\/data/\1/')
+          cp /boot/kernel-* $pref_path/$mrom_path/zImage
+          cp /boot/boot-initramfs.gz $pref_path/$mrom_path/initrd.img
+          cp /boot/hybris-boot.img $pref_path/$mrom_path/boot.img
+          echo "Multirom update done"
+          exit 0
+        fi
+
+        FILENAME=$2
+
+        GZIP=$(file $FILENAME | grep "gzip compressed data" &> /dev/null; echo $?)
+        GZIPTMPFILE=$(mktemp)
+
+        # In case the file is compressed we need to uncompress it
+        if [[ "x$GZIP" == "x0" ]]; then
+                echo "Uncompressing '$FILENAME' to '$GZIPTMPFILE'.."
+                gunzip -c $FILENAME > $GZIPTMPFILE
+                GZ_RETVAL=$(echo $?)
+                if [[ "x$GZ_RETVAL" != "x0" ]]; then
+                        echo "Uncompress failed.."
+                        rm -f $GZIPTMPFILE
+                        exit 1
+                fi
+                FILENAME=$GZIPTMPFILE
+        fi
+
+        # Sparse files need to be unsparsed before flashing..
+        SPARSE=$(hexdump -e '"%02x"' -n 4 $FILENAME)
+        if [[ "$SPARSE" == "ed26ff3a" ]]; then
+                if which simg2img &> /dev/null; then
+                        echo "Unsparsing '$FILENAME' to '$FILENAME.tmp'.."
+                        simg2img "$FILENAME" "$FILENAME.tmp"
+                        SP_RETVAL=$(echo $?)
+                        # NOTE: simg2img returns 0 when out of disk space thus this check does not
+                        # work for all cases.
+                        if [[ "x$SP_RETVAL" != "x0" ]]; then
+                                echo "Unsparsing failed.."
+                                rm -f $FILENAME.tmp $GZIPTMPFILE
+                                exit 1
+                        fi
+                        FILENAME="$FILENAME.tmp"
+                else
+                        rm -f $FILENAME $GZIPTMPFILE
+                        echo "simg2img binary missing unable to continue flashing."
+                        exit 1
+                fi
+        fi
+
+	if [[ "$SAILFISHOS_WIPE_PARTITIONS" == "1" ]]; then
+		dd if=/dev/zero bs=4096 $3 of=$DEVICE
+	fi
+
+        dd if=$FILENAME bs=4096 $3 of=$DEVICE
+
+        if [[ "$SPARSE" == "ed26ff3a" ]]; then
+                rm -f $FILENAME
+        fi
+
+        if [[ "x$GZIP" == "x0" ]]; then
+                rm -f $GZIPTMPFILE
+        fi
+else
+        echo Not running on device, skipping flashing.
+        exit 0
+fi
+

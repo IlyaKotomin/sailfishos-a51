@@ -1,0 +1,17 @@
+[Unit]
+Description=Add the device user to the groups this port needs
+# The user is created by the first-boot wizard, so this cannot usefully run
+# before user sessions are possible.
+After=systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+# Deliberately NOT RemainAfterExit: the unit has to be re-runnable. The
+# first-boot wizard rewrites group membership after the boot-time run, so
+# droid-user-groups.timer fires again a few minutes in -- and starting an
+# already-active RemainAfterExit oneshot is a no-op, which silently defeated
+# the timer entirely.
+ExecStart=/usr/bin/droid/droid-user-groups.sh
+
+[Install]
+WantedBy=multi-user.target

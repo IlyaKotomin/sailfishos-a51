@@ -1,0 +1,16 @@
+[Unit]
+Description=Activate Android dynamic partitions and mount /system /vendor /product /odm
+DefaultDependencies=no
+Before=local-fs.target droid-hal-init.service systemd-modules-load.service
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/droid/droid-dynparts.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=local-fs.target

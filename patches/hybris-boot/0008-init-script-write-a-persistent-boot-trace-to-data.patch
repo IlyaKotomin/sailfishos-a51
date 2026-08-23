@@ -1,0 +1,50 @@
+From 1820915d6ab0e5bae850c0f88764f5fceccf21b8 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 01:39:53 +0300
+Subject: [PATCH 08/14] init-script: write a persistent boot trace to /data
+
+pstore/last_kmsg cannot be reliably attributed to a specific boot attempt
+(multiple buffers, silent truncation, reboots in between), which makes early
+initrd debugging guesswork on devices where the rescue gadget cannot come up.
+
+/data is mounted early and persists, so mirror every klog line there and add
+explicit stage markers around mount_stowaways, including DATA_PARTITION, the
+contents of /target and the relevant /proc/mounts lines.
+---
+ init-script | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/init-script b/init-script
+index febb1ee..3afbb85 100755
+--- a/init-script
++++ b/init-script
+@@ -95,6 +95,9 @@ ANDROID_USB=/sys/class/android_usb/android0
+ # ramoops buffer, which survives a reboot and can be read from recovery.
+ klog() {
+     echo "hybris-boot: $*" > /dev/kmsg 2>/dev/null
++    # /data is mounted early and survives reboots, unlike the initrd tmpfs and
++    # unlike pstore (which is easy to mis-attribute between boot attempts).
++    [ -d /data ] && echo "$*" >> /data/hybris-boot-trace.log 2>/dev/null
+ }
+ 
+ GADGET_DIR=/config/usb_gadget
+@@ -441,6 +444,7 @@ check_kernel_config() {
+ # Now either initrd or rootfs sequence
+ 
+ if [ "$DONE_SWITCH" = "no" ]; then
++    STAGE_TRACE=1
+     EXPLICIT_BUSYBOX=""
+     TELNET_DEBUG_PORT=23
+     /bin/busybox --install -s
+@@ -460,7 +464,11 @@ if [ "$DONE_SWITCH" = "no" ]; then
+ 
+     bootsplash
+ 
++    klog "stage: before mount_stowaways, DATA_PARTITION=$DATA_PARTITION"
+     mount_stowaways
++    klog "stage: after mount_stowaways"
++    klog "  /target: $(ls /target 2>/dev/null | tr '\n' ' ')"
++    klog "  mounts: $(grep -E ' /(data|target) ' /proc/mounts 2>/dev/null | tr '\n' ';')"
+ 
+     # No target debug unless we debug here too (for now)
+ 

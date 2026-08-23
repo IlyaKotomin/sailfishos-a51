@@ -1,0 +1,49 @@
+From d5556da768eae9dbb0f4aaf0516ecbec673b9cf4 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Sat, 22 Aug 2026 04:05:42 +0300
+Subject: [PATCH 3/4] pulseaudio: drive the ALSA card with tsched=0
+
+The ABOX driver never fills in the PCM timestamp, so PulseAudio's timer-based
+scheduling has no clock and every stream ends in a drain timeout while the DMA
+is in fact running fine.
+---
+ .../etc/pulse/default_sailfish.pa.d/droid.pa  | 31 ++++++++++---------
+ 1 file changed, 17 insertions(+), 14 deletions(-)
+
+diff --git a/sparse/etc/pulse/default_sailfish.pa.d/droid.pa b/sparse/etc/pulse/default_sailfish.pa.d/droid.pa
+index 3b5c68c..58e10d4 100644
+--- a/sparse/etc/pulse/default_sailfish.pa.d/droid.pa
++++ b/sparse/etc/pulse/default_sailfish.pa.d/droid.pa
+@@ -1,15 +1,18 @@
+-# The Samsung audio HAL for this device is 32-bit only: the real implementation
+-# is /vendor/lib/hw/audio.primary.exynos9611.so and android.hardware.audio.service
+-# is a 32-bit binary. 64-bit PulseAudio can therefore only dlopen the 64-bit AOSP
+-# stub, audio.primary.default.so, which leaves the audio-patch callbacks NULL --
+-# module-droid-card jumps through one of them in pa_droid_stream_set_route() and
+-# the daemon dies with SIGSEGV on every boot. module-droid-glue and
+-# module-droid-hidl both require the droid card, so they cannot load either.
++# module-droid-card cannot be used on this device: the Samsung audio HAL is
++# 32-bit only (the implementation is /vendor/lib/hw/audio.primary.exynos9611.so
++# and android.hardware.audio.service is a 32-bit binary), so 64-bit PulseAudio
++# can only dlopen the 64-bit AOSP stub audio.primary.default.so. The stub leaves
++# the audio-patch callbacks NULL and module-droid-card jumps through one of them
++# in pa_droid_stream_set_route(), killing the daemon on every boot.
++# module-droid-glue and module-droid-hidl both require the droid card, so they
++# cannot load either.
+ #
+-# Load the ALSA cards the Exynos ABOX driver exposes instead. Sound does not
+-# reach the speaker yet -- the card registers with zero mixer controls and the
+-# PCM hw_ptr never advances, because nothing configures ABOX or the external
+-# amplifier without the vendor HAL -- but the sink is here for whoever picks
+-# that work up. default_sailfish.pa sets sink.null as the default sink, so
+-# nothing blocks on the stalled PCM in the meantime.
+-load-module module-udev-detect
++# Drive the Exynos ABOX ALSA card directly instead. droid-audio-route.service
++# applies the mixer routing the HAL would have set, which is what actually makes
++# sound come out; see /usr/bin/droid/droid-audio-route.sh.
++#
++# tsched=0 is required: the ABOX driver never fills in the PCM timestamp
++# (tstamp stays 0.000000000), so PulseAudio's timer-based scheduling has no
++# clock to work from and every stream dies with "Failed to drain stream:
++# Timeout" even though the DMA is running perfectly.
++load-module module-udev-detect tsched=0

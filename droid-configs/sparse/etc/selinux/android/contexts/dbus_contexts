@@ -1,0 +1,9 @@
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<!-- dbus looks for this as soon as /etc/selinux/config names a SELINUXTYPE and
+     selinuxfs is mounted, and refuses to start the system bus without it. No
+     policy is loaded here, so there is nothing to associate. -->
+<busconfig>
+  <selinux>
+  </selinux>
+</busconfig>

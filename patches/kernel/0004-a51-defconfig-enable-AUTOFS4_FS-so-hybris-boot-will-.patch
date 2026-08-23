@@ -1,0 +1,30 @@
+From 579245719d1b81ff2104e31dcd60f23aa585715a Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 01:22:59 +0300
+Subject: [PATCH 4/8] a51: defconfig: enable AUTOFS4_FS so hybris-boot will
+ boot the rootfs
+
+hybris-boot's initrd runs its own check_kernel_config() and appends to
+/diagnosis.log for every required symbol it cannot find. Any content there
+sets DBG_REASON='Refusing to boot' and drops the device into the rescue
+session instead of switch_root'ing into Sailfish.
+
+CONFIG_AUTOFS4_FS was the only one missing - and notably it is NOT in the
+list mer_verify_kernel_config checks, which reported 0 errors.
+---
+ arch/arm64/configs/vendor/a51-aosp_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/vendor/a51-aosp_defconfig b/arch/arm64/configs/vendor/a51-aosp_defconfig
+index efe669047ae1..3a9886ef9bbb 100644
+--- a/arch/arm64/configs/vendor/a51-aosp_defconfig
++++ b/arch/arm64/configs/vendor/a51-aosp_defconfig
+@@ -5182,7 +5182,7 @@ CONFIG_QUOTA_TREE=y
+ # CONFIG_QFMT_V1 is not set
+ CONFIG_QFMT_V2=y
+ CONFIG_QUOTACTL=y
+-# CONFIG_AUTOFS4_FS is not set
++CONFIG_AUTOFS4_FS=y  # hybris-boot check_kernel_config() refuses to boot without it
+ CONFIG_FUSE_FS=y
+ # CONFIG_CUSE is not set
+ CONFIG_OVERLAY_FS=y

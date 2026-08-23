@@ -1,0 +1,31 @@
+From 8c1555190998b979c163f746498069353180a577 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Sat, 22 Aug 2026 06:44:14 +0300
+Subject: [PATCH 4/4] updater: remove a stale zip before packing a new one
+
+zip adds to an existing archive rather than replacing it, so a zip left in the
+output directory from a previous build keeps all of its old entries. That is how
+the last build produced a 1.08 GB installer containing both the new gzip rootfs
+and the previous bzip2 one -- twice the download, and two rootfs archives in a
+zip whose installer picks one by pattern.
+---
+ kickstart/pack_package-droid-updater | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/kickstart/pack_package-droid-updater b/kickstart/pack_package-droid-updater
+index f8f8cdf..bf75a10 100644
+--- a/kickstart/pack_package-droid-updater
++++ b/kickstart/pack_package-droid-updater
+@@ -46,6 +46,12 @@ mv $GEN_IMG_BASE.tar.gz updater/$DST_IMG
+ sed -i -e "s %VERSION% $VERSION_ID g" -e "s %IMAGE_FILE% $DST_IMG g" -e "s %IMAGE_SIZE% $IMG_SIZE g" updater/META-INF/com/google/android/updater-script
+ 
+ # pack updater .zip
++#
++# zip ADDS to an existing archive instead of replacing it, so a zip left over
++# from an earlier build keeps its old entries -- which is how a release ended up
++# shipping both the new rootfs and the previous one, doubling the download and
++# leaving two rootfs archives for the installer to choose between.
++rm -f $DST_IMG_BASE.zip
+ pushd updater
+ zip -r ../$DST_IMG_BASE.zip META-INF/com/google/android/update-binary META-INF/com/google/android/updater-script updater-unpack.sh hybris-boot.img $DST_IMG_BASE.ks $DST_IMG
+ popd # updater

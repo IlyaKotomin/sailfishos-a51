@@ -1,0 +1,48 @@
+This repository contains configuration, patches, documentation and helper
+scripts for running Sailfish OS on the Samsung Galaxy A51 (SM-A515F).
+
+Original work in this repository
+--------------------------------
+
+The following are original work and are licensed under the GNU General Public
+License version 2:
+
+  patches/kernel/        derived from the Linux kernel (GPL-2.0)
+  patches/hybris-boot/   derived from mer-hybris/hybris-boot (GPL-2.0)
+  patches/droid-configs-device/
+                         four changes to mer-hybris/droid-hal-configs
+  droid-configs/         excluding droid-configs-device/, see below
+  scripts/
+  docs/
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License version 2 as
+    published by the Free Software Foundation.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+See https://www.gnu.org/licenses/old-licenses/gpl-2.0.html for the full text.
+
+Third-party code included here
+------------------------------
+
+droid-configs/droid-configs-device/ is a vendored copy of
+
+    https://github.com/mer-hybris/droid-hal-configs
+
+at upstream commit a9b3995 (2026-07-02), with the four changes in
+patches/droid-configs-device/ applied on top. Vendoring this tree is how the
+Sailfish OS HADK assembles a device configuration package -- upstream it is a
+git submodule. It is included directly here so this repository is a complete,
+self-contained snapshot of what built the released image.
+
+Upstream ships no license file, so this repository asserts no license terms
+over that subdirectory. It is redistributed as received and its copyright
+remains with its respective authors. The GPL-2.0 grant above covers only the
+four patches applied to it, not the upstream files themselves.
+
+If you hold copyright on anything in that subdirectory and want it removed or
+relicensed, open an issue and it will be handled.

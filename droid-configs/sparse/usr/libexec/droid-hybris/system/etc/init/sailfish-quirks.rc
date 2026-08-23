@@ -1,0 +1,103 @@
+# Our rc directory is parsed before /system/etc/init, and Android init keeps the
+# first definition of a service, logging any later one as "ignored duplicate
+# definition of service". Defining these here therefore replaces Samsung's
+# versions -- confirmed by init doing exactly that to its own apexd.rc.
+
+# vold manages Android volumes and encryption. Sailfish handles storage itself,
+# and /data is already mounted by hybris-boot as the parent of our rootfs.
+# Samsung's /system/etc/init/vold.rc arms 'reboot_on_failure reboot,vold-failed',
+# so once servicemanager finally came up and vold actually got to run, its
+# failure rebooted the phone -- a ~60 second boot loop. Define it first, with no
+# reboot trap and disabled so it never runs.
+service vold /system/bin/vold
+    class core
+    disabled
+
+# surfaceflinger aborts on this device with "couldn't find an OpenGL ES
+# implementation", which is harmless in itself: Sailfish composites with
+# lipstick and uses minisfservice in place of surfaceflinger. What is not
+# harmless is its onrestart stanza, which restarts vendor.hwcomposer-2-1 and
+# vendor.gralloc-2-0 on every death -- the two HALs lipstick needs, killed in a
+# loop. Replace it with a disabled definition.
+service surfaceflinger /system/bin/surfaceflinger
+    class core
+    disabled
+
+# The four BoringSSL FIPS self-tests in our own hw/init.rc each carry
+# 'reboot_on_failure reboot,boringssl-self-check-failed'. The two /system/bin
+# ones exit 0, but the apex variants cannot run at all:
+#   Cannot find '/apex/com.android.conscrypt/bin/boringssl_self_test32'
+# com.android.conscrypt is not one of the four apexes apexd's bootstrap pass
+# mounts, and init honours the trap on a failed exec_start -- another ~60s
+# reboot loop. Nothing in Sailfish depends on these self-tests.
+#
+# hw/init.rc is init's primary file and is parsed before this directory, so
+# first-definition-wins does not apply here; redefining these needs the
+# explicit 'override' keyword. Keeping the same exec path means a failed
+# exec_start is still logged, but without a reboot trap attached.
+service boringssl_self_test32 /system/bin/boringssl_self_test32
+    override
+    disabled
+
+service boringssl_self_test64 /system/bin/boringssl_self_test64
+    override
+    disabled
+
+service boringssl_self_test_apex32 /apex/com.android.conscrypt/bin/boringssl_self_test32
+    override
+    disabled
+
+service boringssl_self_test_apex64 /apex/com.android.conscrypt/bin/boringssl_self_test64
+    override
+    disabled
+
+# Samsung's bootchecker is a boot watchdog: it waits for the Android framework
+# to report itself up and calls sys.powerctl='reboot,bootchecker' when that
+# never happens. Sailfish has no zygote or system_server, so sys.boot_completed
+# is never set and bootchecker reboots the phone roughly every 90 seconds, by
+# design. Auditing every binary on the device that can write sys.powerctl found
+# only bootchecker, cbd, gsid/gsi_tool, reboot and init itself -- and cbd is
+# healthy (it opens umts_boot0 normally) -- so this is the last boot watchdog.
+#
+# 'disabled' alone is not enough: bootchecker.rc also carries
+#   on property:init.svc.zygote=restarting
+#       restart bootchecker
+# and 'restart' starts even a disabled service. zygote really is restarting
+# here, and the log shows that action firing. So point the service at a no-op
+# instead, which stays harmless no matter who starts it.
+service bootchecker /system/bin/true
+    override
+    disabled
+    oneshot
+
+service bootchecker-bootc /system/bin/true
+    override
+    disabled
+    oneshot
+
+# zygote is the Android framework's process incubator. Sailfish does not run the
+# framework at all -- lipstick is the UI and minisfservice/minimediaservice
+# stand in for surfaceflinger and mediaserver -- so zygote can only crash-loop,
+# burning CPU and re-triggering the watchdog actions above.
+service zygote /system/bin/true
+    override
+    disabled
+    oneshot
+
+service zygote_secondary /system/bin/true
+    override
+    disabled
+    oneshot
+
+# Android's own cameraserver and droidmedia's minimediaservice both register
+# "media.camera", and whichever starts last wins. When cameraserver wins,
+# gst-droid's connect is refused: CameraService only trusts AID_MEDIA,
+# AID_CAMERASERVER and AID_RADIO, and asks the framework permission service
+# about everyone else -- a service that does not exist here, so the answer is
+# always no and droidcamsrc dies with "error opening camera" (even as root).
+# minimediaservice is the stand-in that ports are meant to use, so keep the
+# stock one out of its way.
+service cameraserver /system/bin/true
+    override
+    disabled
+    oneshot

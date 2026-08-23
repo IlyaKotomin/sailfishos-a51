@@ -1,0 +1,46 @@
+From baad41f380ed0d74ae7f582367fba601e016311b Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 01:34:32 +0300
+Subject: [PATCH 07/14] init-script: surface /diagnosis.log and the boot
+ decision
+
+When check_kernel_config() or mount_stowaways() object, the initrd refuses to
+boot and explains itself in /diagnosis.log - which only exists in the initrd
+tmpfs. If the rescue USB gadget cannot come up (Samsung Exynos), that
+explanation is unreachable and the device just appears to hang.
+
+Mirror each line to /dev/kmsg (survives in pstore) and copy the file to /data,
+and log the resulting DBG_REASON plus whether /target/sbin/init is present.
+---
+ init-script | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/init-script b/init-script
+index 5279b78..febb1ee 100755
+--- a/init-script
++++ b/init-script
+@@ -465,12 +465,23 @@ if [ "$DONE_SWITCH" = "no" ]; then
+     # No target debug unless we debug here too (for now)
+ 
+     DBG_REASON=""
+-    [ -e /diagnosis.log ] && DBG_REASON="Refusing to boot. See /diagnosis.log (in initrd only)"
++    if [ -e /diagnosis.log ]; then
++        DBG_REASON="Refusing to boot. See /diagnosis.log (in initrd only)"
++        # /diagnosis.log lives in the initrd tmpfs and dies with the reboot, and
++        # on SoCs where the rescue gadget cannot come up (e.g. Exynos) it is then
++        # impossible to find out what the initrd objected to. Mirror it into the
++        # kernel log (survives in pstore/ramoops) and onto /data if mounted.
++        while read -r dline; do klog "diagnosis: $dline"; done < /diagnosis.log
++        cp /diagnosis.log /data/hybris-diagnosis.log 2>/dev/null && \
++            klog "diagnosis copied to /data/hybris-diagnosis.log"
++    fi
+     [ "$(get_opt bootmode)" = "debug" ] && DBG_REASON="bootmode=debug on kernel command line"
+     [ x$ALWAYSDEBUG = x1 ] && DBG_REASON="Always debug: rndis + mass_storage"
+     [ -f /target/init_enter_debug ] && DBG_REASON="/init_enter_debug exists"
+     [ -f /target/init_disable_telnet ] && DISABLE_TELNET="y"
+ 
++    klog "boot decision: DBG_REASON='${DBG_REASON}' (empty means continue to rootfs)"
++    klog "target check: /target/sbin/init $([ -e /target/sbin/init ] && echo present || echo MISSING)"
+     if ! [ "$DBG_REASON" = "" ] ; then
+ 	# During debug we export mmc too (some variations in location here)
+ 	lun=/sys/class/android_usb/f_mass_storage/lun/file

@@ -1,0 +1,107 @@
+From c4e34720cc28a6c97af1ad90446bb7deb92efe54 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Thu, 20 Aug 2026 04:04:04 +0300
+Subject: [PATCH 1/8] a51: defconfig: satisfy mer_verify_kernel_config
+
+Set the 12 symbols the Mer kernel checker flags as ERROR for Sailfish OS:
+SYSVIPC/FHANDLE/VT/DEVTMPFS(+_MOUNT) for systemd and hybris-boot's init
+script, L2TP_V3/L2TP_IP/INET_AH/INET_IPCOMP for IPSec+VPN, RPFILTER and
+XT_MATCH_MULTIPORT for connman's iptables use, and unset DUMMY.
+---
+ arch/arm64/configs/vendor/a51-aosp_defconfig | 25 ++++++++++++--------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/configs/vendor/a51-aosp_defconfig b/arch/arm64/configs/vendor/a51-aosp_defconfig
+index 378f4042f721..efe669047ae1 100644
+--- a/arch/arm64/configs/vendor/a51-aosp_defconfig
++++ b/arch/arm64/configs/vendor/a51-aosp_defconfig
+@@ -51,10 +51,10 @@ CONFIG_LOCALVERSION_AUTO=y
+ CONFIG_LOCALVERSION_BRANCH_SHA=y
+ CONFIG_DEFAULT_HOSTNAME="(none)"
+ CONFIG_SWAP=y
+-# CONFIG_SYSVIPC is not set
++CONFIG_SYSVIPC=y
+ # CONFIG_POSIX_MQUEUE is not set
+ CONFIG_CROSS_MEMORY_ATTACH=y
+-# CONFIG_FHANDLE is not set
++CONFIG_FHANDLE=y
+ # CONFIG_USELIB is not set
+ CONFIG_AUDIT=y
+ CONFIG_HAVE_ARCH_AUDITSYSCALL=y
+@@ -742,10 +742,10 @@ CONFIG_NET_IPVTI=y
+ CONFIG_NET_UDP_TUNNEL=y
+ # CONFIG_NET_FOU is not set
+ # CONFIG_NET_FOU_IP_TUNNELS is not set
+-# CONFIG_INET_AH is not set
++CONFIG_INET_AH=y
+ CONFIG_INET_ESP=y
+ # CONFIG_INET_ESP_OFFLOAD is not set
+-# CONFIG_INET_IPCOMP is not set
++CONFIG_INET_IPCOMP=y
+ # CONFIG_INET_XFRM_TUNNEL is not set
+ CONFIG_INET_TUNNEL=y
+ CONFIG_INET_XFRM_MODE_TRANSPORT=y
+@@ -933,7 +933,7 @@ CONFIG_NETFILTER_XT_MATCH_LENGTH=y
+ CONFIG_NETFILTER_XT_MATCH_LIMIT=y
+ CONFIG_NETFILTER_XT_MATCH_MAC=y
+ CONFIG_NETFILTER_XT_MATCH_MARK=y
+-# CONFIG_NETFILTER_XT_MATCH_MULTIPORT is not set
++CONFIG_NETFILTER_XT_MATCH_MULTIPORT=y
+ # CONFIG_NETFILTER_XT_MATCH_NFACCT is not set
+ # CONFIG_NETFILTER_XT_MATCH_OSF is not set
+ CONFIG_NETFILTER_XT_MATCH_OWNER=y
+@@ -974,7 +974,7 @@ CONFIG_NF_NAT_H323=y
+ CONFIG_IP_NF_IPTABLES=y
+ CONFIG_IP_NF_MATCH_AH=y
+ CONFIG_IP_NF_MATCH_ECN=y
+-# CONFIG_IP_NF_MATCH_RPFILTER is not set
++CONFIG_IP_NF_MATCH_RPFILTER=y
+ CONFIG_IP_NF_MATCH_TTL=y
+ CONFIG_IP_NF_FILTER=y
+ CONFIG_IP_NF_TARGET_REJECT=y
+@@ -1027,7 +1027,7 @@ CONFIG_IP6_NF_RAW=y
+ # CONFIG_TIPC is not set
+ # CONFIG_ATM is not set
+ CONFIG_L2TP=y
+-# CONFIG_L2TP_V3 is not set
++CONFIG_L2TP_V3=y
+ # CONFIG_BRIDGE is not set
+ CONFIG_HAVE_NET_DSA=y
+ # CONFIG_NET_DSA is not set
+@@ -1223,7 +1223,7 @@ CONFIG_ARM_AMBA=y
+ #
+ CONFIG_UEVENT_HELPER=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-# CONFIG_DEVTMPFS is not set
++CONFIG_DEVTMPFS=y
+ CONFIG_STANDALONE=y
+ CONFIG_PREVENT_FIRMWARE_BUILD=y
+ CONFIG_FW_LOADER=y
+@@ -1608,7 +1608,7 @@ CONFIG_NETDEVICES=y
+ CONFIG_MII=y
+ CONFIG_NET_CORE=y
+ # CONFIG_BONDING is not set
+-CONFIG_DUMMY=y
++# CONFIG_DUMMY is not set
+ # CONFIG_EQUALIZER is not set
+ # CONFIG_IFB is not set
+ # CONFIG_NET_TEAM is not set
+@@ -2104,7 +2104,7 @@ CONFIG_SERIO_LIBPS2=y
+ # Character devices
+ #
+ CONFIG_TTY=y
+-# CONFIG_VT is not set
++CONFIG_VT=y
+ CONFIG_UNIX98_PTYS=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_SERIAL_NONSTANDARD is not set
+@@ -5899,3 +5899,8 @@ CONFIG_ARCH_HAS_SG_CHAIN=y
+ CONFIG_SBITMAP=y
+ # CONFIG_STRING_SELFTEST is not set
+ CONFIG_FPSIMD_CORRUPTION_DETECT=y
++
++
++# Added for Sailfish OS / Mer (mer_verify_kernel_config), 2026-08-20
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_L2TP_IP=y
+\ No newline at end of file

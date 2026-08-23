@@ -1,0 +1,39 @@
+From aba626ffa4b139fb3eb820a92412bd62cbee5351 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 00:28:20 +0300
+Subject: [PATCH 02/14] init-script: do not assume mmcblk0 for the mass_storage
+ LUN
+
+The debug mass_storage path hardcoded /dev/mmcblk0. UFS devices such as
+Exynos 9611 expose /dev/sda instead, so the LUN was never set and USB
+mass storage silently did nothing. Probe for the real disk.
+---
+ init-script | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/init-script b/init-script
+index 1b4bba0..5265e4c 100755
+--- a/init-script
++++ b/init-script
+@@ -403,9 +403,19 @@ if [ "$DONE_SWITCH" = "no" ]; then
+     if ! [ "$DBG_REASON" = "" ] ; then
+ 	# During debug we export mmc too (some variations in location here)
+ 	lun=/sys/class/android_usb/f_mass_storage/lun/file
+-	if [ -f $lun ]; then echo /dev/mmcblk0 > $lun; fi
++	if [ -f $lun ]; then
++	    # UFS devices (e.g. Exynos 9611) have no mmcblk0; pick the real disk
++	    for disk in /dev/mmcblk0 /dev/sda; do
++		[ -b $disk ] && { echo $disk > $lun; break; }
++	    done
++	fi
+ 	lun=/sys/class/android_usb/f_mass_storage/lun0/file
+-	if [ -f $lun ]; then echo /dev/mmcblk0 > $lun; fi
++	if [ -f $lun ]; then
++	    # UFS devices (e.g. Exynos 9611) have no mmcblk0; pick the real disk
++	    for disk in /dev/mmcblk0 /dev/sda; do
++		[ -b $disk ] && { echo $disk > $lun; break; }
++	    done
++	fi
+ 	USB_FUNCTIONS=rndis,mass_storage
+ 
+ 	run_debug_session $DBG_REASON

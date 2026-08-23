@@ -1,0 +1,17 @@
+[Unit]
+Description=Mount selinuxfs and load the Android SELinux policy
+DefaultDependencies=no
+# needs /system and /vendor, which droid-dynparts mounts
+After=local-fs.target droid-dynparts.service
+Before=droid-hal-init.service basic.target
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/droid/droid-sepolicy.sh
+TimeoutStartSec=180
+
+[Install]
+WantedBy=basic.target

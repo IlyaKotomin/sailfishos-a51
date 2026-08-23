@@ -1,0 +1,85 @@
+From a6c590cac8f5ba8bfbe9f3c195e3418108d1e99a Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 00:45:13 +0300
+Subject: [PATCH 03/14] init-script: negotiate a working ethernet-over-USB
+ function
+
+rndis is assumed to work, but Samsung's patched configfs on Exynos 9611
+accepts the mkdir and then refuses to bind it:
+
+  configfs-gadget 13200000.dwc3: failed to start g1: -22
+
+Disabling CONFIG_USB_G_ANDROID is not an option there - Samsung's
+configfs.c and dwc3/gadget.c reference store_usblog_notify/NOTIFY_USBSTATE
+and fail to compile without it.
+
+So instead: create the first ethernet function the kernel provides
+(rndis/ncm/eem/ecm), and if writing UDC still fails, tear it down and retry
+with the next candidate. Also report the function actually in use.
+---
+ init-script | 37 +++++++++++++++++++++++++++++--------
+ 1 file changed, 29 insertions(+), 8 deletions(-)
+
+diff --git a/init-script b/init-script
+index 5265e4c..e77070c 100755
+--- a/init-script
++++ b/init-script
+@@ -219,13 +219,21 @@ usb_setup_configfs() {
+     write $GADGET_DIR/g1/strings/0x409/product      "$CUSTOMPRODUCT"
+ 
+     if echo $USB_FUNCTIONS | grep -q "rndis"; then
+-        mkdir $GADGET_DIR/g1/functions/rndis.usb0
+-        # rndis_bam is Qualcomm BAM hardware (CONFIG_USB_CONFIGFS_RNDIS_BAM).
+-        # On non-Qualcomm SoCs (e.g. Exynos) this function does not exist, the
+-        # mkdir fails, and linking it into c.1 leaves a broken function that
+-        # makes writing to UDC fail with -EINVAL:
++        # Try each ethernet-over-USB function this kernel might provide, in
++        # preference order, and keep the first one that instantiates. Samsung's
++        # patched configfs (Exynos) accepts rndis via mkdir but can still refuse
++        # to bind it, so an alternative is needed:
+         #   configfs-gadget <udc>: failed to start g1: -22
+-        # ...which kills USB networking and telnet debugging entirely.
++        NETFUNC=""
++        for f in rndis.usb0 ncm.usb0 eem.usb0 ecm.usb0; do
++            if mkdir $GADGET_DIR/g1/functions/$f 2>/dev/null; then
++                NETFUNC="$f"
++                break
++            fi
++        done
++        # rndis_bam is Qualcomm BAM hardware (CONFIG_USB_CONFIGFS_RNDIS_BAM) and
++        # does not exist on Exynos; linking a function that failed to instantiate
++        # invalidates the whole composite gadget.
+         mkdir $GADGET_DIR/g1/functions/rndis_bam.rndis 2>/dev/null
+     fi
+     echo $USB_FUNCTIONS | grep -q "mass_storage" && mkdir $GADGET_DIR/g1/functions/storage.0
+@@ -235,7 +243,7 @@ usb_setup_configfs() {
+     write $GADGET_DIR/g1/configs/c.1/strings/0x409/configuration "$USB_FUNCTIONS"
+ 
+     if echo $USB_FUNCTIONS | grep -q "rndis"; then
+-        ln -s $GADGET_DIR/g1/functions/rndis.usb0 $GADGET_DIR/g1/configs/c.1
++        [ -n "$NETFUNC" ] && ln -s $GADGET_DIR/g1/functions/$NETFUNC $GADGET_DIR/g1/configs/c.1
+         # only link rndis_bam if the kernel actually instantiated it
+         [ -d $GADGET_DIR/g1/functions/rndis_bam.rndis ] && \
+             ln -s $GADGET_DIR/g1/functions/rndis_bam.rndis $GADGET_DIR/g1/configs/c.1
+@@ -252,7 +260,20 @@ usb_setup_configfs() {
+         done
+     fi
+     write /sys/class/udc/"$udc"/device/../mode peripheral
+-    echo "$udc" > $GADGET_DIR/g1/UDC
++    if ! echo "$udc" > $GADGET_DIR/g1/UDC 2>/dev/null; then
++        echo "########################## UDC bind failed with $NETFUNC, trying alternatives"
++        for alt in ncm.usb0 eem.usb0 ecm.usb0 rndis.usb0; do
++            [ "$alt" = "$NETFUNC" ] && continue
++            rm -f $GADGET_DIR/g1/configs/c.1/$NETFUNC 2>/dev/null
++            rmdir $GADGET_DIR/g1/functions/$NETFUNC 2>/dev/null
++            mkdir $GADGET_DIR/g1/functions/$alt 2>/dev/null || continue
++            ln -s $GADGET_DIR/g1/functions/$alt $GADGET_DIR/g1/configs/c.1 2>/dev/null || continue
++            NETFUNC="$alt"
++            echo "########################## retrying UDC with $alt"
++            echo "$udc" > $GADGET_DIR/g1/UDC 2>/dev/null && break
++        done
++    fi
++    echo "########################## gadget function in use: $NETFUNC"
+ }
+ 
+ # This sets up the USB with whatever USB_FUNCTIONS are set to via android_usb

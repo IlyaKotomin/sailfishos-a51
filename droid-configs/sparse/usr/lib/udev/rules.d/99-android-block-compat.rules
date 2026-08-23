@@ -1,0 +1,7 @@
+# Android userspace addresses block devices as /dev/block/<name> and partitions
+# as /dev/block/by-name/<label>; udev exposes them as /dev/<name> and
+# /dev/disk/by-partlabel/<label>. apexd in particular waits for
+# /dev/block/loopN after asking loop-control for a free device, and those
+# appear dynamically, so a static symlink farm is not enough.
+SUBSYSTEM=="block", SYMLINK+="block/%k"
+SUBSYSTEM=="block", ENV{PARTNAME}!="", SYMLINK+="block/by-name/$env{PARTNAME}"

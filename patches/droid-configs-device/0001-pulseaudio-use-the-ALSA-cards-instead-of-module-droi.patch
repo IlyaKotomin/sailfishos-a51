@@ -1,0 +1,56 @@
+From 11a5309445addc76a885b6b19400b775f05c39e8 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 20:39:44 +0300
+Subject: [PATCH 1/4] pulseaudio: use the ALSA cards instead of
+ module-droid-card
+
+The Samsung audio HAL is 32-bit only, so 64-bit PulseAudio can only dlopen the
+64-bit AOSP stub, whose audio-patch callbacks are NULL. module-droid-card jumps
+through one of them in pa_droid_stream_set_route() and the daemon dies with
+SIGSEGV on every boot, taking module-droid-glue and module-droid-hidl with it.
+---
+ .../etc/pulse/default_sailfish.pa.d/droid.pa  | 37 ++++++++-----------
+ 1 file changed, 15 insertions(+), 22 deletions(-)
+
+diff --git a/sparse/etc/pulse/default_sailfish.pa.d/droid.pa b/sparse/etc/pulse/default_sailfish.pa.d/droid.pa
+index ebe7d48..3b5c68c 100644
+--- a/sparse/etc/pulse/default_sailfish.pa.d/droid.pa
++++ b/sparse/etc/pulse/default_sailfish.pa.d/droid.pa
+@@ -1,22 +1,15 @@
+-### If droid-card needs other arguments than the default, have the new
+-### load-module line in /etc/pulse/arm_droid_card_custom.pa
+-.ifexists /etc/pulse/arm_droid_card_custom.pa
+- .include /etc/pulse/arm_droid_card_custom.pa
+-.else
+- load-module module-droid-card rate=48000
+-.endif
+-
+-### Needed on devices with older Android bases.
+-### HADK guide explains how to implement this fully
+-.ifexists module-droid-glue.so
+- .nofail
+- load-module module-droid-glue
+- .fail
+-.endif
+-
+-### Needed on many new devices. HADK guide explains how to implement this fully
+-.ifexists module-droid-hidl.so
+- .nofail
+- load-module module-droid-hidl
+- .fail
+-.endif
++# The Samsung audio HAL for this device is 32-bit only: the real implementation
++# is /vendor/lib/hw/audio.primary.exynos9611.so and android.hardware.audio.service
++# is a 32-bit binary. 64-bit PulseAudio can therefore only dlopen the 64-bit AOSP
++# stub, audio.primary.default.so, which leaves the audio-patch callbacks NULL --
++# module-droid-card jumps through one of them in pa_droid_stream_set_route() and
++# the daemon dies with SIGSEGV on every boot. module-droid-glue and
++# module-droid-hidl both require the droid card, so they cannot load either.
++#
++# Load the ALSA cards the Exynos ABOX driver exposes instead. Sound does not
++# reach the speaker yet -- the card registers with zero mixer controls and the
++# PCM hw_ptr never advances, because nothing configures ABOX or the external
++# amplifier without the vendor HAL -- but the sink is here for whoever picks
++# that work up. default_sailfish.pa sets sink.null as the default sink, so
++# nothing blocks on the stalled PCM in the meantime.
++load-module module-udev-detect

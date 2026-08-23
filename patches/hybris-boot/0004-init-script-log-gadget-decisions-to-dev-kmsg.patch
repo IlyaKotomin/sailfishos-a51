@@ -1,0 +1,73 @@
+From a6bc48c5ee5dc8cad24aeb2f04aa036c10fa3b87 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 00:56:24 +0300
+Subject: [PATCH 04/14] init-script: log gadget decisions to /dev/kmsg
+
+The initrd runs without a console ('unable to open an initial console'), so
+its echo output is discarded and the gadget setup is undebuggable when USB
+does not come up - the only failure mode where you cannot telnet in to look.
+
+Write the important steps to /dev/kmsg instead: it reaches the kernel ring
+buffer and therefore pstore/ramoops, which survives the reboot and can be
+read from recovery.
+---
+ init-script | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/init-script b/init-script
+index e77070c..3c29a25 100755
+--- a/init-script
++++ b/init-script
+@@ -90,6 +90,13 @@ export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+ USB_FUNCTIONS=rndis
+ 
+ ANDROID_USB=/sys/class/android_usb/android0
++# The initrd has no console ("unable to open an initial console"), so plain echo
++# is invisible. /dev/kmsg lands in the kernel log and therefore in pstore's
++# ramoops buffer, which survives a reboot and can be read from recovery.
++klog() {
++    echo "hybris-boot: $*" > /dev/kmsg 2>/dev/null
++}
++
+ GADGET_DIR=/config/usb_gadget
+ LOCAL_IP=192.168.2.15
+ 
+@@ -228,8 +235,10 @@ usb_setup_configfs() {
+         for f in rndis.usb0 ncm.usb0 eem.usb0 ecm.usb0; do
+             if mkdir $GADGET_DIR/g1/functions/$f 2>/dev/null; then
+                 NETFUNC="$f"
++                klog "created function $f"
+                 break
+             fi
++            klog "function $f unavailable"
+         done
+         # rndis_bam is Qualcomm BAM hardware (CONFIG_USB_CONFIGFS_RNDIS_BAM) and
+         # does not exist on Exynos; linking a function that failed to instantiate
+@@ -260,8 +269,9 @@ usb_setup_configfs() {
+         done
+     fi
+     write /sys/class/udc/"$udc"/device/../mode peripheral
++    klog "udc=$udc netfunc=$NETFUNC, writing UDC"
+     if ! echo "$udc" > $GADGET_DIR/g1/UDC 2>/dev/null; then
+-        echo "########################## UDC bind failed with $NETFUNC, trying alternatives"
++        klog "UDC bind FAILED with $NETFUNC, trying alternatives"
+         for alt in ncm.usb0 eem.usb0 ecm.usb0 rndis.usb0; do
+             [ "$alt" = "$NETFUNC" ] && continue
+             rm -f $GADGET_DIR/g1/configs/c.1/$NETFUNC 2>/dev/null
+@@ -269,11 +279,13 @@ usb_setup_configfs() {
+             mkdir $GADGET_DIR/g1/functions/$alt 2>/dev/null || continue
+             ln -s $GADGET_DIR/g1/functions/$alt $GADGET_DIR/g1/configs/c.1 2>/dev/null || continue
+             NETFUNC="$alt"
+-            echo "########################## retrying UDC with $alt"
+-            echo "$udc" > $GADGET_DIR/g1/UDC 2>/dev/null && break
++            klog "retrying UDC with $alt"
++            echo "$udc" > $GADGET_DIR/g1/UDC 2>/dev/null && { klog "UDC bound with $alt"; break; }
+         done
+     fi
+-    echo "########################## gadget function in use: $NETFUNC"
++    klog "gadget function in use: $NETFUNC"
++    klog "udc state: $(cat /sys/class/udc/$udc/state 2>/dev/null)"
++    klog "net ifaces: $(ls /sys/class/net 2>/dev/null | tr '\n' ' ')"
+ }
+ 
+ # This sets up the USB with whatever USB_FUNCTIONS are set to via android_usb

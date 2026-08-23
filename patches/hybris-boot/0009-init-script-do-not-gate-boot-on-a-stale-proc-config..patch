@@ -1,0 +1,47 @@
+From e188df3d3eafe510afdbd51238a188117103e392 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 01:57:28 +0300
+Subject: [PATCH 09/14] init-script: do not gate boot on a stale
+ /proc/config.gz
+
+On Samsung Exynos 9611 the kernel's embedded IKCONFIG blob does not match the
+kernel that was built. Verified on a Galaxy A51, kernel 4.14.150:
+
+  include/config/auto.conf      CONFIG_DEVTMPFS=y CONFIG_SYSVIPC=y CONFIG_VT=y
+                                CONFIG_DEVTMPFS_MOUNT=y CONFIG_AUTOFS4_FS=y
+  include/generated/autoconf.h  #define CONFIG_DEVTMPFS 1 (etc)
+  /proc/config.gz               reports all five unset
+
+check_kernel_config() therefore appended five bogus lines to /diagnosis.log,
+which made the initrd refuse to boot a perfectly good kernel - and on this SoC
+the rescue gadget cannot come up, so the device just sat there silently.
+
+Detect the inconsistency (devtmpfs listed in /proc/filesystems while the blob
+claims CONFIG_DEVTMPFS is unset) and skip the gate with a loud warning rather
+than refusing to boot.
+---
+ init-script | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/init-script b/init-script
+index 3afbb85..deeeb4a 100755
+--- a/init-script
++++ b/init-script
+@@ -429,6 +429,17 @@ check_kernel_config() {
+     echo "Checking kernel config"
+     if [ ! -e /proc/config.gz ]; then
+ 	echo "No /proc/config.gz. Enable CONFIG_IKCONFIG and CONFIG_IKCONFIG_PROC" >> /diagnosis.log
++    elif grep -q devtmpfs /proc/filesystems && \
++         ! zcat /proc/config.gz 2>/dev/null | grep -qE '^CONFIG_DEVTMPFS=y'; then
++	# Samsung (Exynos 9611) ships a kernel whose embedded IKCONFIG blob does not
++	# match the kernel that was actually built: include/config/auto.conf and
++	# autoconf.h have CONFIG_DEVTMPFS/SYSVIPC/VT/AUTOFS4_FS=y, and the features
++	# demonstrably work, while /proc/config.gz still reports them unset. Gating
++	# the boot on that blob makes the device unbootable for no reason, so detect
++	# the inconsistency (devtmpfs present in /proc/filesystems but absent from
++	# the blob) and skip the check instead of refusing to boot.
++	klog "WARNING: /proc/config.gz is stale (devtmpfs works but blob disagrees)"
++	klog "WARNING: skipping the kernel config gate - verify features at runtime"
+     else
+ 	# Must be =y
+ 	for x in CONFIG_CGROUPS CONFIG_AUTOFS4_FS CONFIG_DEVTMPFS_MOUNT CONFIG_DEVTMPFS CONFIG_UNIX CONFIG_INOTIFY_USER CONFIG_SYSVIPC CONFIG_NET CONFIG_PROC_FS CONFIG_SIGNALFD CONFIG_SYSFS CONFIG_TMPFS_POSIX_ACL CONFIG_VT; do

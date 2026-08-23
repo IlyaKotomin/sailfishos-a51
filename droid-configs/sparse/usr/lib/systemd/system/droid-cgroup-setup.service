@@ -1,0 +1,20 @@
+[Unit]
+Description=Set up the Android cgroup hierarchy droid-hal-init does not
+DefaultDependencies=no
+# Needs /system mounted (droid-dynparts) for cgroups.json and task_profiles.json,
+# and must run before any Android service starts, since a service that cannot
+# find its task profile aborts rather than continuing.
+After=droid-dynparts.service
+Before=droid-hal-init.service
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/droid/droid-cgroup-setup.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=local-fs.target

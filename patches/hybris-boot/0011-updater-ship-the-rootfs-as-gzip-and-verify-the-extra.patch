@@ -1,0 +1,98 @@
+From fb4d5df5bb98d795f6dccd9553d14b54a99270a7 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 21:09:05 +0300
+Subject: [PATCH 11/14] updater: ship the rootfs as gzip and verify the
+ extraction
+
+TWRP's busybox tar forks an external bzip2 for -j, and many TWRP builds -- the
+a51 one included -- do not carry that binary. Worse, the failure is silent:
+busybox prints 'tar: exec bzip2: No such file or directory' and still exits 0,
+so updater-script's abort() never fires. rm -rf has already removed the old
+rootfs by then and the kernel gets flashed over nothing, so the installer
+reports success and leaves an unbootable phone.
+
+gzip needs no helper binary, and checking for a real rootfs afterwards means an
+extraction failure can no longer be mistaken for success.
+---
+ fixup-mountpoints | 32 ++++++++++++++++++++++++++++++++
+ updater-unpack.sh | 20 +++++++++++++++++---
+ 2 files changed, 49 insertions(+), 3 deletions(-)
+
+diff --git a/fixup-mountpoints b/fixup-mountpoints
+index 8e66c1d..aa200c0 100755
+--- a/fixup-mountpoints
++++ b/fixup-mountpoints
+@@ -14,6 +14,38 @@ shift
+ echo "Fixing mount-points for device $DEVICE"
+ 
+ case "$DEVICE" in
++    "a51")
++        sed -i \
++            -e 's block/platform/13520000.ufs/by-name/boot sda12 ' \
++            -e 's block/by-name/boot sda12 ' \
++            -e 's block/platform/13520000.ufs/by-name/cache sda28 ' \
++            -e 's block/by-name/cache sda28 ' \
++            -e 's block/platform/13520000.ufs/by-name/cpefs sdd1 ' \
++            -e 's block/by-name/cpefs sdd1 ' \
++            -e 's block/platform/13520000.ufs/by-name/efs sda1 ' \
++            -e 's block/by-name/efs sda1 ' \
++            -e 's block/platform/13520000.ufs/by-name/metadata sda24 ' \
++            -e 's block/by-name/metadata sda24 ' \
++            -e 's block/platform/13520000.ufs/by-name/misc sda18 ' \
++            -e 's block/by-name/misc sda18 ' \
++            -e 's block/platform/13520000.ufs/by-name/omr sda29 ' \
++            -e 's block/by-name/omr sda29 ' \
++            -e 's block/platform/13520000.ufs/by-name/optics sda27 ' \
++            -e 's block/by-name/optics sda27 ' \
++            -e 's block/platform/13520000.ufs/by-name/param sda3 ' \
++            -e 's block/by-name/param sda3 ' \
++            -e 's block/platform/13520000.ufs/by-name/persistent sda17 ' \
++            -e 's block/by-name/persistent sda17 ' \
++            -e 's block/platform/13520000.ufs/by-name/prism sda26 ' \
++            -e 's block/by-name/prism sda26 ' \
++            -e 's block/platform/13520000.ufs/by-name/recovery sda13 ' \
++            -e 's block/by-name/recovery sda13 ' \
++            -e 's block/platform/13520000.ufs/by-name/super sda25 ' \
++            -e 's block/by-name/super sda25 ' \
++            -e 's block/platform/13520000.ufs/by-name/userdata sda32 ' \
++            -e 's block/by-name/userdata sda32 ' \
++            "$@"
++        ;;
+     "pdx235")
+         sed -i \
+             -e 's block/bootdevice/by-name/LTALabel sda3 ' \
+diff --git a/updater-unpack.sh b/updater-unpack.sh
+index 8d0e81e..605b26c 100644
+--- a/updater-unpack.sh
++++ b/updater-unpack.sh
+@@ -1,13 +1,27 @@
+ #! /sbin/sh
+ 
+-FS_ARC="/data/sailfishos-rootfs.tar.bz2"
++# The rootfs is shipped gzip-compressed rather than bzip2: TWRP's busybox tar
++# forks an external bzip2 for -j, and plenty of TWRP builds (including the a51
++# one) do not carry that binary. The failure is silent -- busybox prints
++# "tar: exec bzip2: No such file or directory" and still exits 0, so the caller
++# happily flashes the kernel over a rootfs that was never extracted, leaving an
++# unbootable phone. Hence gzip, and hence the sanity check below.
++
++FS_ARC="/data/sailfishos-rootfs.tar.gz"
+ FS_DST="/data/.stowaways/sailfishos"
+ 
+ rm -rf $FS_DST
+ mkdir -p $FS_DST
+-tar --numeric-owner -xvjf $FS_ARC -C $FS_DST
++tar --numeric-owner -xzf $FS_ARC -C $FS_DST
+ EXIT=$?
+ 
+-rm $FS_ARC
++# Do not trust the exit code on its own: confirm the extraction actually
++# produced a root filesystem before reporting success.
++if [ ! -x $FS_DST/sbin/init ] && [ ! -e $FS_DST/etc/os-release ]; then
++    echo "extraction produced no rootfs in $FS_DST"
++    EXIT=1
++fi
++
++[ $EXIT -eq 0 ] && rm $FS_ARC
+ 
+ exit $EXIT

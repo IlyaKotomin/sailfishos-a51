@@ -1,0 +1,52 @@
+From 675a535bf1975819952549a7ce3d15abc5cd36c1 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 00:25:13 +0300
+Subject: [PATCH 01/14] init-script: only use rndis_bam where the kernel
+ provides it
+
+usb_setup_configfs() unconditionally created and linked
+functions/rndis_bam.rndis, which is Qualcomm BAM hardware
+(CONFIG_USB_CONFIGFS_RNDIS_BAM). On Exynos 9611 that function does not
+exist, so the mkdir failed and the dangling link in configs/c.1 made the
+composite gadget invalid:
+
+  configfs-gadget 13200000.dwc3: failed to start g1: -22
+
+With no gadget there is no rndis0, no telnet and no Mer Boat Loader on
+USB, so the device boots the kernel, unpacks the initramfs and then sits
+idle with no way to debug it. Guard the mkdir and only link the function
+if it actually instantiated.
+---
+ init-script | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/init-script b/init-script
+index 79e39d9..1b4bba0 100755
+--- a/init-script
++++ b/init-script
+@@ -220,7 +220,13 @@ usb_setup_configfs() {
+ 
+     if echo $USB_FUNCTIONS | grep -q "rndis"; then
+         mkdir $GADGET_DIR/g1/functions/rndis.usb0
+-        mkdir $GADGET_DIR/g1/functions/rndis_bam.rndis
++        # rndis_bam is Qualcomm BAM hardware (CONFIG_USB_CONFIGFS_RNDIS_BAM).
++        # On non-Qualcomm SoCs (e.g. Exynos) this function does not exist, the
++        # mkdir fails, and linking it into c.1 leaves a broken function that
++        # makes writing to UDC fail with -EINVAL:
++        #   configfs-gadget <udc>: failed to start g1: -22
++        # ...which kills USB networking and telnet debugging entirely.
++        mkdir $GADGET_DIR/g1/functions/rndis_bam.rndis 2>/dev/null
+     fi
+     echo $USB_FUNCTIONS | grep -q "mass_storage" && mkdir $GADGET_DIR/g1/functions/storage.0
+ 
+@@ -230,7 +236,9 @@ usb_setup_configfs() {
+ 
+     if echo $USB_FUNCTIONS | grep -q "rndis"; then
+         ln -s $GADGET_DIR/g1/functions/rndis.usb0 $GADGET_DIR/g1/configs/c.1
+-        ln -s $GADGET_DIR/g1/functions/rndis_bam.rndis $GADGET_DIR/g1/configs/c.1
++        # only link rndis_bam if the kernel actually instantiated it
++        [ -d $GADGET_DIR/g1/functions/rndis_bam.rndis ] && \
++            ln -s $GADGET_DIR/g1/functions/rndis_bam.rndis $GADGET_DIR/g1/configs/c.1
+     fi
+     echo $USB_FUNCTIONS | grep -q "mass_storage" && ln -s $GADGET_DIR/g1/functions/storage.0 $GADGET_DIR/g1/configs/c.1
+ 

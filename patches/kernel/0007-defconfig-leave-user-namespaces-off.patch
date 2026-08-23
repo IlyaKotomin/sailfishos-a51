@@ -1,0 +1,26 @@
+From 340ac7b45a1b965ea92dc22a8fdb5658252df5e9 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Sat, 22 Aug 2026 06:24:50 +0300
+Subject: [PATCH 7/8] defconfig: leave user namespaces off
+
+This is what the working kernel on the device was actually built with -- the
+running kernel has no /proc/self/uid_map, and Waydroid's LXC config declares no
+lxc.idmap, so the container does not need them. Committing it so the image build
+reproduces the kernel that is known to boot and run Android.
+---
+ arch/arm64/configs/vendor/a51-aosp_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/vendor/a51-aosp_defconfig b/arch/arm64/configs/vendor/a51-aosp_defconfig
+index b1b4c838613d..df112e5cdda4 100644
+--- a/arch/arm64/configs/vendor/a51-aosp_defconfig
++++ b/arch/arm64/configs/vendor/a51-aosp_defconfig
+@@ -160,7 +160,7 @@ CONFIG_SOCK_CGROUP_DATA=y
+ # CONFIG_CHECKPOINT_RESTORE is not set
+ CONFIG_NAMESPACES=y
+ CONFIG_UTS_NS=y
+-CONFIG_USER_NS=y
++# CONFIG_USER_NS is not set
+ CONFIG_PID_NS=y
+ CONFIG_NET_NS=y
+ # CONFIG_SCHED_AUTOGROUP is not set

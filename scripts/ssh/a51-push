@@ -1,0 +1,13 @@
+#!/bin/bash
+# Copy local files to the phone.
+#   ~/a51-sfos-port/ssh/a51-push <local...> <remote-dir-or-path>
+HOST=${A51_HOST:?set A51_HOST to the phone's WLAN address}
+USER_=${A51_USER:-defaultuser}
+export A51_PASS=${A51_PASS:?set A51_PASS to the developer-mode password}
+export SSH_ASKPASS=~/a51-sfos-port/ssh/askpass.sh
+export SSH_ASKPASS_REQUIRE=force
+export DISPLAY=:0
+n=$#; dest=${!n}
+setsid -w scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o ConnectTimeout=8 -o LogLevel=ERROR \
+    "${@:1:$((n-1))}" "$USER_@$HOST:$dest" 2>&1

@@ -1,0 +1,41 @@
+From c8629d8c75e1c6b0fde673abdb863b20e076d5f8 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 21:15:49 +0300
+Subject: [PATCH 12/14] init: do not reboot when the debug USB interface cannot
+ be set up
+
+run_debug_session() is called unconditionally from the post-switch_root path,
+so this is not a debug-only code path -- it runs on every normal boot. On this
+device the USB gadget cannot be brought up at all: writing the android_usb /
+configfs gadget panics the kernel through Samsung's conn_gadget_cleanup, so
+those writes are refused on purpose. The reboot then turns a missing debug
+channel into an unbootable phone.
+---
+ init-script | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/init-script b/init-script
+index 56554c0..38d3122 100755
+--- a/init-script
++++ b/init-script
+@@ -382,12 +382,15 @@ run_debug_session() {
+     # Report for the logs
+     /sbin/ifconfig -a
+ 
+-    # Unable to set up USB interface? Reboot.
++    # No USB interface. Do NOT reboot over this: run_debug_session is called
++    # unconditionally on every normal boot from the post-switch_root path, and
++    # on this device the USB gadget deliberately cannot be brought up (writing
++    # the android_usb/configfs gadget panics the kernel through Samsung's
++    # conn_gadget_cleanup, so the writes are refused). Rebooting here bootloops
++    # the phone for want of a debug channel it was never going to get.
+     if [ x$USB_IFACE = xnotfound ]; then
+-	    usb_info "Mer Debug: ERROR: could not setup USB as usb0 or rndis0"
+-	    dmesg
+-	    sleep 60 # plenty long enough to check usb on host
+-	    reboot -f
++	    usb_info "Mer Debug: no USB net iface, continuing without telnet"
++	    return 0
+     fi
+ 
+     # Create /etc/udhcpd.conf file.

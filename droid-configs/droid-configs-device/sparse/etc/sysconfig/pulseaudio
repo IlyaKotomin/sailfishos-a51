@@ -1,0 +1,2 @@
+HYBRIS_USE_VENDOR_NAMESPACE=yes
+CONFIG="-n --file=/etc/pulse/default_sailfish.pa"

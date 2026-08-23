@@ -1,0 +1,17 @@
+[Unit]
+Description=Start the Android NFC HAL service
+# Android marks this HAL disabled so its framework can start it on demand;
+# nothing here does, so nfcd would have no INfc interface to bind.
+After=droid-hal-init.service
+Wants=droid-hal-init.service
+Before=nfcd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/droid/droid-nfc-hal.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

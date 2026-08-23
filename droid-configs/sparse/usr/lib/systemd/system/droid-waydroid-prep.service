@@ -1,0 +1,14 @@
+[Unit]
+Description=Create Waydroid binder nodes and PulseAudio socket path
+Before=waydroid-container.service
+After=droid-hal-init.service local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/droid/droid-waydroid-prep.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+From 56e336efdccedf8df5165ad88d17dde60e46b511 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Sat, 22 Aug 2026 17:52:13 +0300
+Subject: [PATCH 14/14] updater: do not delete the old rootfs before checking
+ the archive exists
+
+The script removed the destination and only then tried to extract, so a missing
+or misnamed archive wiped a working installation and left the phone unbootable --
+which is what happened on a real install when the gzip switch left the
+updater-script copying to .tar.bz2 while this read .tar.gz. A failed install has
+to leave the previous system intact.
+---
+ updater-unpack.sh | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/updater-unpack.sh b/updater-unpack.sh
+index 605b26c..c3880ad 100644
+--- a/updater-unpack.sh
++++ b/updater-unpack.sh
+@@ -10,6 +10,17 @@
+ FS_ARC="/data/sailfishos-rootfs.tar.gz"
+ FS_DST="/data/.stowaways/sailfishos"
+ 
++# Check the archive is there BEFORE touching the destination. This script used
++# to remove the old rootfs first and only then discover the archive was missing,
++# which turned a wrong filename into a wiped, unbootable installation -- exactly
++# what happened when the gzip switch left the updater-script copying to
++# .tar.bz2 while this read .tar.gz. A failed install must leave the previous
++# system alone.
++if [ ! -f "$FS_ARC" ]; then
++    echo "no rootfs archive at $FS_ARC, refusing to touch $FS_DST"
++    exit 1
++fi
++
+ rm -rf $FS_DST
+ mkdir -p $FS_DST
+ tar --numeric-owner -xzf $FS_ARC -C $FS_DST

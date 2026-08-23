@@ -1,0 +1,14 @@
+# Sailfish ships systemd built +SELINUX. When selinuxfs is mounted, and Android
+# needs it mounted -- servicemanager and vndservicemanager CHECK-fail on
+# selinux_status_open without it -- is_selinux_enabled() becomes true and
+# libselinux looks for this file. With it absent, selabel_open() returns NULL and
+# systemd's helpers dereference it: systemd-user-sessions and systemd-logind both
+# took SIGSEGV, which cost the Login Service, the user session and lipstick.
+#
+# Measured in a chroot: selinuxfs mounted without this file -> exit 139;
+# with it -> exit 0.
+#
+# Permissive because the kernel cmdline already asks for permissive
+# (androidboot.selinux=permissive) and no policy is loaded.
+SELINUX=permissive
+SELINUXTYPE=android

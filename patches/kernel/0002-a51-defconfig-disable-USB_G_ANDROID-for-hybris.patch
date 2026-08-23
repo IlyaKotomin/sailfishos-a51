@@ -1,0 +1,32 @@
+From 8975da5b8ff56595e05e965d12a968c34ef88a97 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 00:40:02 +0300
+Subject: [PATCH 2/8] a51: defconfig: disable USB_G_ANDROID for hybris
+
+Samsung's legacy android_usb gadget is built in, and something claims the
+dwc3 UDC ~4s before hybris-boot's init reaches configfs, so writing
+g1/UDC fails:
+
+  configfs-gadget 13200000.dwc3: failed to start g1: -22
+
+No USB gadget means no rndis0, no telnet and no way to debug first boot.
+hybris expects the configfs path to own the UDC.
+---
+ arch/arm64/configs/vendor/a51-aosp_defconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/vendor/a51-aosp_defconfig b/arch/arm64/configs/vendor/a51-aosp_defconfig
+index efe669047ae1..6b2dd900c69a 100644
+--- a/arch/arm64/configs/vendor/a51-aosp_defconfig
++++ b/arch/arm64/configs/vendor/a51-aosp_defconfig
+@@ -3812,7 +3812,9 @@ CONFIG_USB_GADGET_VBUS_DRAW=2
+ CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS=2
+ # CONFIG_U_SERIAL_CONSOLE is not set
+ # CONFIG_USB_OLD_CONFIGFS is not set
+-CONFIG_USB_G_ANDROID=y
++# CONFIG_USB_G_ANDROID is not set  # hybris: legacy android_usb gadget claims the dwc3 UDC at ~1s, before
++# hybris-boot init reaches configfs, so writing g1/UDC fails with -EINVAL:
++#   configfs-gadget 13200000.dwc3: failed to start g1: -22
+ CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE=y
+ # CONFIG_USB_ANDROID_SAMSUNG_MTP is not set
+ CONFIG_USB_DUN_SUPPORT=y

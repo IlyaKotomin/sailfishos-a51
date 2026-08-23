@@ -1,0 +1,18 @@
+# module-droid-card cannot be used on this device: the Samsung audio HAL is
+# 32-bit only (the implementation is /vendor/lib/hw/audio.primary.exynos9611.so
+# and android.hardware.audio.service is a 32-bit binary), so 64-bit PulseAudio
+# can only dlopen the 64-bit AOSP stub audio.primary.default.so. The stub leaves
+# the audio-patch callbacks NULL and module-droid-card jumps through one of them
+# in pa_droid_stream_set_route(), killing the daemon on every boot.
+# module-droid-glue and module-droid-hidl both require the droid card, so they
+# cannot load either.
+#
+# Drive the Exynos ABOX ALSA card directly instead. droid-audio-route.service
+# applies the mixer routing the HAL would have set, which is what actually makes
+# sound come out; see /usr/bin/droid/droid-audio-route.sh.
+#
+# tsched=0 is required: the ABOX driver never fills in the PCM timestamp
+# (tstamp stays 0.000000000), so PulseAudio's timer-based scheduling has no
+# clock to work from and every stream dies with "Failed to drain stream:
+# Timeout" even though the DMA is running perfectly.
+load-module module-udev-detect tsched=0

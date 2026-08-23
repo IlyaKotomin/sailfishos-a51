@@ -1,0 +1,25 @@
+From b350325cc005704114bb204190b9d1d7a0c0e30e Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 00:44:30 +0300
+Subject: [PATCH 3/8] Revert "a51: defconfig: disable USB_G_ANDROID for hybris"
+
+This reverts commit f87b0f4269f6e7c11c9f08695c0edc9c8c14d22b.
+---
+ arch/arm64/configs/vendor/a51-aosp_defconfig | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/arch/arm64/configs/vendor/a51-aosp_defconfig b/arch/arm64/configs/vendor/a51-aosp_defconfig
+index 6b2dd900c69a..efe669047ae1 100644
+--- a/arch/arm64/configs/vendor/a51-aosp_defconfig
++++ b/arch/arm64/configs/vendor/a51-aosp_defconfig
+@@ -3812,9 +3812,7 @@ CONFIG_USB_GADGET_VBUS_DRAW=2
+ CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS=2
+ # CONFIG_U_SERIAL_CONSOLE is not set
+ # CONFIG_USB_OLD_CONFIGFS is not set
+-# CONFIG_USB_G_ANDROID is not set  # hybris: legacy android_usb gadget claims the dwc3 UDC at ~1s, before
+-# hybris-boot init reaches configfs, so writing g1/UDC fails with -EINVAL:
+-#   configfs-gadget 13200000.dwc3: failed to start g1: -22
++CONFIG_USB_G_ANDROID=y
+ CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE=y
+ # CONFIG_USB_ANDROID_SAMSUNG_MTP is not set
+ CONFIG_USB_DUN_SUPPORT=y

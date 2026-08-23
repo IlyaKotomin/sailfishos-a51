@@ -1,0 +1,61 @@
+From d46cadb093fded34c84a68cf8b6e399f43c5c858 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 01:08:41 +0300
+Subject: [PATCH 05/14] init-script: prefer Samsung's legacy android_usb
+ interface on Exynos
+
+Evidence from a Galaxy A51 (Exynos 9611, kernel 4.14.150):
+
+ * functions/rndis.usb0 is created fine, but writing g1/UDC fails:
+     configfs-gadget 13200000.dwc3: failed to start g1: -22
+   and the UDC stays 'not attached'.
+ * TWRP binds the very same UDC successfully using ffs.* functions, so the
+   controller works - Samsung's configfs just will not bind rndis.
+ * /sys/class/udc/<udc>/device/../mode does not exist on Exynos, so the
+   peripheral-mode write in usb_setup_configfs silently does nothing.
+ * /sys/class/android_usb/android0 DOES exist with functions/enable, but only
+   after a configfs gadget has been created - so the existing check for it
+   misses on a cold boot and we fall into the configfs path that cannot work.
+
+Create the g1 skeleton first, re-check for android_usb, and use the legacy
+functions/enable interface when present.
+---
+ init-script | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/init-script b/init-script
+index 3c29a25..4c1fa32 100755
+--- a/init-script
++++ b/init-script
+@@ -303,14 +303,30 @@ usb_setup_android_usb() {
+     write $ANDROID_USB/iSerial         "$1"
+     write $ANDROID_USB/functions       $USB_FUNCTIONS
+     write $ANDROID_USB/enable          1
++    klog "android_usb: functions=$(cat $ANDROID_USB/functions 2>/dev/null) state=$(cat $ANDROID_USB/state 2>/dev/null)"
++    klog "udc state: $(cat /sys/class/udc/*/state 2>/dev/null | head -1)"
++    klog "net ifaces: $(ls /sys/class/net 2>/dev/null | tr '\n' ' ')"
+ }
+ 
+ # This determines which USB setup method is going to be used
+ usb_setup() {
+     if [ -d $ANDROID_USB ]; then
++        klog "using legacy android_usb path"
+         usb_setup_android_usb $1
+     elif [ -d $GADGET_DIR ]; then
+-        usb_setup_configfs $1
++        # Samsung (Exynos) creates /sys/class/android_usb/android0 only once a
++        # configfs gadget exists, so the check above misses it on a cold boot.
++        # Their configfs also refuses to bind rndis directly (usb_gadget_udc_start
++        # -> -EINVAL, "failed to start g1: -22"), while the legacy functions/enable
++        # interface works. Create the skeleton, then re-check.
++        mkdir $GADGET_DIR/g1 2>/dev/null
++        if [ -d $ANDROID_USB ]; then
++            klog "android_usb appeared after creating g1, using legacy path"
++            usb_setup_android_usb $1
++        else
++            klog "no android_usb, falling back to raw configfs"
++            usb_setup_configfs $1
++        fi
+     fi
+ }
+ 

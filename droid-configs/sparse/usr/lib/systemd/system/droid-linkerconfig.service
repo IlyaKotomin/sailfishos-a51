@@ -1,0 +1,15 @@
+[Unit]
+Description=Keep the Sailfish section in the Android linker configuration
+After=droid-hal-init.service
+
+[Service]
+# Type=simple, not oneshot: this watches for three minutes because init rewrites
+# the config once apexd has activated all the apexes, and must not delay the boot
+# while doing so.
+Type=simple
+ExecStart=/bin/sh /usr/bin/droid/droid-linkerconfig.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+From eb824f04d9815c01b9c982da37ef3b0d2891c51d Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Sat, 22 Aug 2026 17:51:23 +0300
+Subject: [PATCH 13/14] updater: copy the rootfs to the name the unpacker
+ actually reads
+
+Switching the rootfs to gzip changed updater-unpack.sh to read
+/data/sailfishos-rootfs.tar.gz but left the updater-script copying the archive
+to /data/sailfishos-rootfs.tar.bz2, so the unpacker found nothing:
+
+    tar: /data/sailfishos-rootfs.tar.gz: No such file or directory
+    extraction produced no rootfs in /data/.stowaways/sailfishos
+
+The extraction check added in the same change is what turned this into a clean
+abort instead of a bricked phone -- the installer stopped before writing
+hybris-boot.img, so the existing system stayed bootable. Without that check this
+would have flashed a kernel over an empty rootfs, which is exactly the failure it
+was written for.
+---
+ updater-script | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/updater-script b/updater-script
+index 2084f81..2416e59 100644
+--- a/updater-script
++++ b/updater-script
+@@ -18,7 +18,7 @@ ui_print("Device check succeeded, mounting filesystems ...");
+ mount("ext4", "EMMC", "%DATA_PART%", "/data");
+ 
+ ui_print("Copying filesystem archive ...");
+-package_extract_file("%IMAGE_FILE%", "/data/sailfishos-rootfs.tar.bz2");
++package_extract_file("%IMAGE_FILE%", "/data/sailfishos-rootfs.tar.gz");
+ ui_print("Copying installation script ...");
+ package_extract_file("updater-unpack.sh", "/tmp/updater-unpack.sh");
+ 

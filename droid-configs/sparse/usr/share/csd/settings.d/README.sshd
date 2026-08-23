@@ -1,0 +1,14 @@
+SSH is enabled at boot by this port (etc/systemd/system/multi-user.target.wants/
+sshd.socket), which stock Sailfish leaves disabled until you turn on Remote
+connection in Developer tools.
+
+Why: on a fresh install the developer page shows no connection address at all
+until sshd is running, which reads as "Wi-Fi debugging is broken" when in fact
+nothing is listening. For a port that people will need to debug remotely, having
+it up from first boot is more useful than the stock default.
+
+Consequence worth knowing: an SSH server listens on every interface the phone
+has an address on, and it accepts the account password. Set a real one under
+Settings -> Developer tools, or disable the service:
+
+    systemctl disable --now sshd.socket

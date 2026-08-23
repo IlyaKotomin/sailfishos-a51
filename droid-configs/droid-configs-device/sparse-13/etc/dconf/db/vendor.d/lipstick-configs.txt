@@ -1,0 +1,6 @@
+[desktop/lipstick-jolla-home/peekfilter]
+boundaryHeight=60
+boundaryWidth=60
+keyboardBoundaryHeight=30
+keyboardBoundaryWidth=30
+pressDelay=800

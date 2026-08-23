@@ -1,0 +1,36 @@
+From 0d7556734e5d9f5e82715a7da69008b8838ca26f Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 02:06:20 +0300
+Subject: [PATCH 10/14] init-script: never leave the gadget config without a
+ function
+
+My earlier function-negotiation rewrite could leave configs/c.1 empty, and the
+kernel then rejects the bind outright:
+
+  Config c/1 of g1 needs at least one function.
+  configfs-gadget 13200000.dwc3: failed to start g1: -22
+
+That -EINVAL was self-inflicted, not Samsung refusing rndis. Always link a
+function (falling back to rndis.usb0) and log what ended up in the config.
+---
+ init-script | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/init-script b/init-script
+index deeeb4a..56554c0 100755
+--- a/init-script
++++ b/init-script
+@@ -255,7 +255,12 @@ usb_setup_configfs() {
+     write $GADGET_DIR/g1/configs/c.1/strings/0x409/configuration "$USB_FUNCTIONS"
+ 
+     if echo $USB_FUNCTIONS | grep -q "rndis"; then
+-        [ -n "$NETFUNC" ] && ln -s $GADGET_DIR/g1/functions/$NETFUNC $GADGET_DIR/g1/configs/c.1
++        # NETFUNC is set by the loop above; fall back to rndis.usb0 so the config
++        # can never end up with zero functions ("Config c/1 of g1 needs at least
++        # one function." -> failed to start g1: -22)
++        [ -n "$NETFUNC" ] || NETFUNC=rndis.usb0
++        ln -s $GADGET_DIR/g1/functions/$NETFUNC $GADGET_DIR/g1/configs/c.1
++        klog "linked $NETFUNC into configs/c.1: $(ls $GADGET_DIR/g1/configs/c.1 2>/dev/null | tr '\n' ' ')"
+         # only link rndis_bam if the kernel actually instantiated it
+         [ -d $GADGET_DIR/g1/functions/rndis_bam.rndis ] && \
+             ln -s $GADGET_DIR/g1/functions/rndis_bam.rndis $GADGET_DIR/g1/configs/c.1

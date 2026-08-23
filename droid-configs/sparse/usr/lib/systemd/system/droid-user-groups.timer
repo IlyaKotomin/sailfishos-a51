@@ -1,0 +1,14 @@
+[Unit]
+Description=Re-add the device user to the port's groups after first-boot setup
+# The boot-time service runs before the startup wizard, and the wizard rewrites
+# group membership afterwards -- so on a fresh install the boot-time addition is
+# discarded and only reappears on the next boot. Running once more a few minutes
+# in makes it stick on the very first boot too.
+
+[Timer]
+OnBootSec=240
+AccuracySec=30
+Unit=droid-user-groups.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,23 @@
+# build leftovers
+installroot/
+tmp/
+*.rpm
+*.zip
+*.tar.gz
+*.tar.bz2
+*.img
+
+# python
+__pycache__/
+*.pyc
+
+# editor noise
+*~
+.*.swp
+
+# never publish device forensics: core dumps carry process memory
+# (wifi credentials, session tokens); journals and phone backups carry PII
+cores/
+logs/
+*.core
+*.journal

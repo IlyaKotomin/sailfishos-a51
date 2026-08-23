@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply the audio mixer routing the Android HAL would set
+# The ALSA card must exist; the script also waits for it defensively.
+After=local-fs.target droid-hal-init.service
+Before=user@100000.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/droid/droid-audio-route.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

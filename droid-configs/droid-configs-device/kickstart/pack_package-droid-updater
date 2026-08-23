@@ -1,0 +1,65 @@
+pushd $IMG_OUT_DIR
+
+DEVICE=@DEVICE@
+
+VERSION_FILE=./os-release
+source $VERSION_FILE
+
+# Locate rootfs tar.bz2 archive.
+for filename in *.tar.bz2; do
+    GEN_IMG_BASE=$(basename $filename .tar.bz2)
+done
+
+if [ ! -e "$GEN_IMG_BASE.tar.bz2" ]; then
+    echo "No rootfs archive found, exiting ..."
+    exit 1
+fi
+
+# Recompress the rootfs as gzip. TWRP's busybox tar forks an external bzip2 for
+# -j and many TWRP builds do not ship that binary; worse, it then fails silently
+# (exit 0), so the installer flashes the kernel over a rootfs that was never
+# extracted and the phone will not boot. gzip needs no helper.
+echo "Recompressing rootfs as gzip for the updater zip ..."
+bunzip2 -c $GEN_IMG_BASE.tar.bz2 | gzip -9 > $GEN_IMG_BASE.tar.gz || {
+    echo "Failed to recompress the rootfs, exiting ..."
+    exit 1
+}
+
+IMG_SIZE=$(du -h $GEN_IMG_BASE.tar.gz | cut -f1)
+
+# Output filenames
+DST_IMG_BASE=$ID-$DEVICE-$SAILFISH_FLAVOUR-$VERSION_ID@EXTRA_NAME@
+DST_IMG=$DST_IMG_BASE.tar.gz
+
+# Copy boot image, updater scripts and updater binary into updater .zip tree.
+mkdir -p updater/META-INF/com/google/android
+
+mv update-binary updater/META-INF/com/google/android/update-binary
+mv hybris-updater-script updater/META-INF/com/google/android/updater-script
+mv hybris-updater-unpack.sh updater/updater-unpack.sh
+mv hybris-boot.img updater/hybris-boot.img
+
+# Temporarily move the gzip rootfs into the updater directory
+mv $GEN_IMG_BASE.tar.gz updater/$DST_IMG
+
+# Update updater-script with image details.
+sed -i -e "s %VERSION% $VERSION_ID g" -e "s %IMAGE_FILE% $DST_IMG g" -e "s %IMAGE_SIZE% $IMG_SIZE g" updater/META-INF/com/google/android/updater-script
+
+# pack updater .zip
+#
+# zip ADDS to an existing archive instead of replacing it, so a zip left over
+# from an earlier build keeps its old entries -- which is how a release ended up
+# shipping both the new rootfs and the previous one, doubling the download and
+# leaving two rootfs archives for the installer to choose between.
+rm -f $DST_IMG_BASE.zip
+pushd updater
+zip -r ../$DST_IMG_BASE.zip META-INF/com/google/android/update-binary META-INF/com/google/android/updater-script updater-unpack.sh hybris-boot.img $DST_IMG_BASE.ks $DST_IMG
+popd # updater
+
+# The gzip copy was only needed for the zip; the bz2 original is kept
+rm -f updater/$DST_IMG
+
+# Clean up updater .zip working directory.
+rm -rf updater
+
+popd # $IMG_OUT_DIR

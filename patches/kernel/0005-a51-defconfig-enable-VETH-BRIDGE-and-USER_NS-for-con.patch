@@ -1,0 +1,91 @@
+From c3b22ac6995cea119fb50cecad58d91f79694828 Mon Sep 17 00:00:00 2001
+From: mostlys4nny <mostlys4nny@gmail.com>
+Date: Fri, 21 Aug 2026 22:28:50 +0300
+Subject: [PATCH 5/8] a51: defconfig: enable VETH, BRIDGE and USER_NS for
+ containers
+
+Waydroid runs Android in a privileged LXC container and wires its networking
+with a veth pair on a bridge, so without VETH/BRIDGE the container comes up with
+no network at all; LXC also wants USER_NS. These are prerequisites only -- they
+do not make Waydroid work by themselves, and like every config change on this
+tree they need a boot test before being trusted (CONFIG_BT booted the kernel and
+then reset the device; CONFIG_RFKILL=m silently disabled Wi-Fi).
+---
+ arch/arm64/configs/vendor/a51-aosp_defconfig | 29 ++++++++++++++++----
+ 1 file changed, 23 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/configs/vendor/a51-aosp_defconfig b/arch/arm64/configs/vendor/a51-aosp_defconfig
+index 3a9886ef9bbb..b1b4c838613d 100644
+--- a/arch/arm64/configs/vendor/a51-aosp_defconfig
++++ b/arch/arm64/configs/vendor/a51-aosp_defconfig
+@@ -160,7 +160,7 @@ CONFIG_SOCK_CGROUP_DATA=y
+ # CONFIG_CHECKPOINT_RESTORE is not set
+ CONFIG_NAMESPACES=y
+ CONFIG_UTS_NS=y
+-# CONFIG_USER_NS is not set
++CONFIG_USER_NS=y
+ CONFIG_PID_NS=y
+ CONFIG_NET_NS=y
+ # CONFIG_SCHED_AUTOGROUP is not set
+@@ -1028,7 +1028,7 @@ CONFIG_IP6_NF_RAW=y
+ # CONFIG_ATM is not set
+ CONFIG_L2TP=y
+ CONFIG_L2TP_V3=y
+-# CONFIG_BRIDGE is not set
++CONFIG_BRIDGE=y
+ CONFIG_HAVE_NET_DSA=y
+ # CONFIG_NET_DSA is not set
+ # CONFIG_VLAN_8021Q is not set
+@@ -1154,7 +1154,16 @@ CONFIG_NET_FLOW_LIMIT=y
+ # CONFIG_NET_SUPPORT_DROPDUMP is not set
+ # CONFIG_HAMRADIO is not set
+ # CONFIG_CAN is not set
+-# CONFIG_BT is not set
++CONFIG_BT=m
++CONFIG_BT_BREDR=y
++CONFIG_BT_RFCOMM=m
++CONFIG_BT_RFCOMM_TTY=y
++CONFIG_BT_BNEP=m
++CONFIG_BT_BNEP_MC_FILTER=y
++CONFIG_BT_BNEP_PROTO_FILTER=y
++CONFIG_BT_HIDP=m
++CONFIG_BT_LE=y
++CONFIG_BT_HCIVHCI=m
+ # CONFIG_AF_RXRPC is not set
+ # CONFIG_AF_KCM is not set
+ # CONFIG_STREAM_PARSER is not set
+@@ -1176,7 +1185,12 @@ CONFIG_CFG80211_REG_NOT_UPDATED=y
+ # CONFIG_MAC80211 is not set
+ CONFIG_MAC80211_STA_HASH_MAX_SIZE=0
+ # CONFIG_WIMAX is not set
+-# CONFIG_RFKILL is not set
++# RFKILL must be built in, not a module: CFG80211 depends on
++# "RFKILL || !RFKILL", so RFKILL=m demotes CFG80211 to m, which in turn
++# demotes SCSC_WLAN, and Wi-Fi stops working entirely.
++CONFIG_RFKILL=y
++CONFIG_RFKILL_LEDS=y
++CONFIG_RFKILL_INPUT=y
+ # CONFIG_NET_9P is not set
+ # CONFIG_CAIF is not set
+ # CONFIG_CEPH_LIB is not set
+@@ -1622,7 +1636,10 @@ CONFIG_NET_CORE=y
+ # CONFIG_NET_POLL_CONTROLLER is not set
+ CONFIG_TUN=y
+ # CONFIG_TUN_VNET_CROSS_LE is not set
+-# CONFIG_VETH is not set
++# Container support, needed by Waydroid: it runs Android in a privileged
++# LXC container and wires its network with a veth pair on a bridge. Without
++# VETH/BRIDGE the container has no networking at all, and LXC wants USER_NS.
++CONFIG_VETH=y
+ # CONFIG_NLMON is not set
+ 
+ #
+@@ -5182,7 +5199,7 @@ CONFIG_QUOTA_TREE=y
+ # CONFIG_QFMT_V1 is not set
+ CONFIG_QFMT_V2=y
+ CONFIG_QUOTACTL=y
+-CONFIG_AUTOFS4_FS=y  # hybris-boot check_kernel_config() refuses to boot without it
++CONFIG_AUTOFS4_FS=y
+ CONFIG_FUSE_FS=y
+ # CONFIG_CUSE is not set
+ CONFIG_OVERLAY_FS=y
