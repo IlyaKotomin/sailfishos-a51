@@ -1,8 +1,9 @@
 # Installing
 
 > **This replaces Android.** Sailfish lives in `/data/.stowaways/sailfishos` and
-> takes over the boot partition. Your Android user data stays on `/data` but
-> becomes inaccessible from Sailfish. Back up anything you care about first.
+> takes over the boot partition. A first install **formats `/data`**, so every
+> photo, message and app on the phone is erased. Unlocking the bootloader wipes
+> it as well, and trips the KNOX warranty bit permanently. Back up first.
 
 ## Requirements
 
@@ -34,7 +35,7 @@ kind of thing that produces a phone that will not boot:
 sha256sum -c SHA256SUMS
 ```
 
-## Steps
+## First install, coming from Android
 
 **1. Install stock Android 13 (`A515FXXU8HWI1`) and boot it once.**
 
@@ -44,16 +45,36 @@ sha256sum -c SHA256SUMS
 - Power off, then hold **Volume Up + Volume Down** while plugging in USB to enter
   download mode, and follow the on-screen unlock prompt (this wipes the device)
 
-**3. Flash TWRP** to the recovery partition:
+**3. Boot Android again and connect it to Wi-Fi.** Do not skip this step.
+Samsung's VaultKeeper only *blesses* the unlock after the device has been online
+once. Until then the bootloader still refuses unofficial images, and flashing
+TWRP fails with *"Only official released binaries are allowed to be flashed"* —
+which looks like a broken download rather than what it is.
+
+**4. Flash TWRP** to the recovery partition:
 
 ```bash
 heimdall flash --RECOVERY twrp-3.7.1_12-0-a51.img --no-reboot
 ```
 
-**4. Boot into TWRP** — hold **Volume Up + Power** (release Power when the logo
-appears). Let it mount `/data` when asked.
+Then hold **Volume Up + Power** to boot *straight* into TWRP. Do not let it boot
+Android first, or stock recovery is restored and you have to flash it again.
 
-**5. Copy the zip to the phone.** From TWRP, with the phone connected:
+**5. Run the multidisabler.** In TWRP → Advanced → Terminal:
+
+```bash
+multidisabler
+```
+
+Run it **twice**. This disables Samsung's forced encryption and stops stock
+recovery being reinstated on the next boot.
+
+**6. Format data** — TWRP → Wipe → **Format Data** → type `yes`.
+
+This is required, not optional: `/data` is encrypted by default, and TWRP cannot
+write the rootfs into an encrypted partition. It erases your Android user data.
+
+**7. Copy the zip to the phone**, with the phone connected:
 
 ```bash
 adb push sailfishos-a51-release-5.1.0.11-a51-12.zip /sdcard/
@@ -66,18 +87,30 @@ produces a phone that will not boot:
 adb shell sha256sum /sdcard/sailfishos-a51-release-5.1.0.11-a51-12.zip
 ```
 
-**6. Install** → select the zip → swipe to confirm.
+**8. Install** → select the zip → swipe to confirm.
 
-No wipe is needed. The installer extracts the rootfs into
-`/data/.stowaways/sailfishos` and writes the boot partition itself. It checks
-that the extraction actually produced a rootfs before touching the kernel, so a
-failed install leaves the previous system bootable.
-
-**7. Reboot.** First boot takes a few minutes: the SELinux policy is compiled on
+**9. Reboot.** First boot takes a few minutes: the SELinux policy is compiled on
 the device, the cgroup hierarchy is built, and first-boot defaults are seeded.
 
-**8. Complete the setup wizard.** The Jolla account is optional — skip it if you
+**10. Complete the setup wizard.** The Jolla account is optional — skip it if you
 like; it only gates the Jolla Store.
+
+## Updating an existing Sailfish install
+
+If Sailfish is already on the phone, **none of the wipe steps apply**. No
+multidisabler, no Format Data — encryption is already off and `/data` already
+holds your Sailfish home.
+
+1. Boot into TWRP (**Volume Up + Power**)
+2. `adb push` the new zip and check its `sha256sum`, as above
+3. Install → select the zip → swipe
+
+The installer extracts the rootfs into `/data/.stowaways/sailfishos` and writes
+the boot partition itself. It verifies the extraction actually produced a rootfs
+*before* touching the kernel, so a failed update leaves the previous system
+bootable.
+
+Your home directory under `/data` is preserved across an update.
 
 ## After installing
 
