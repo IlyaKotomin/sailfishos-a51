@@ -36,6 +36,24 @@ Untested rather than known-broken: calls and SMS (blocked by the modem),
 microphone recording, camera flash and video recording, an actual GPS fix, the
 SD card slot, and MTP.
 
+## Screenshots
+
+<p>
+<img src="docs/screenshots/01-bluetooth-scan.jpg" width="24%" alt="Bluetooth scanning, listing nearby devices by name">
+<img src="docs/screenshots/02-quick-settings.jpg" width="24%" alt="Ambience switcher and quick toggles">
+<img src="docs/screenshots/03-home-screen.jpg" width="24%" alt="Home screen with running apps">
+<img src="docs/screenshots/04-terminal.jpg" width="24%" alt="Terminal running on the device">
+</p>
+
+Left to right: Bluetooth finding real devices by name — the fix described in
+[docs/PORTING-NOTES.md](docs/PORTING-NOTES.md); the ambience switcher and quick
+toggles; the home screen; a terminal.
+
+> These are photographs of the phone, not screen captures, and **this unit has a
+> replacement screen rather than the original Samsung panel** — so the cutout
+> shape and the colour rendition are the replacement's, not a stock A51's and not
+> anything the port does. The device is a genuine SM-A515F.
+
 ## Documentation
 
 | | |
